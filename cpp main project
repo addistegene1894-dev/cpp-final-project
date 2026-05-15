@@ -100,6 +100,68 @@ void registerUser() {
     if (executeSQL(sql)) cout << "User registered successfully!\n";
 }
 
+//  TRANSACTIONS
+void issueBook() {
+    if (currentUser.role == "Member") {
+        cout << "Access Denied!\n";
+        return;
+    }
+
+    int bookId, userId;
+    cout << "\nEnter Book ID: ";
+    cin >> bookId;
+    cout << "Enter Borrower User ID: ";
+    cin >> userId;
+    cin.ignore();
+
+    if (!canBorrow(userId)) return;
+
+    // Check book availability safely
+    bool available = false;
+    sqlite3_stmt* stmt = nullptr;
+    string q = "SELECT isAvailable FROM books WHERE bookId = " + to_string(bookId) + ";";
+
+    if (sqlite3_prepare_v2(db, q.c_str(), -1, &stmt, nullptr) == SQLITE_OK) {
+        if (sqlite3_step(stmt) == SQLITE_ROW) {
+            available = sqlite3_column_int(stmt, 0) == 1;
+        }
+    }
+    if (stmt) sqlite3_finalize(stmt);
+
+    if (!available) {
+        cout << " Book not available or doesn't exist!\n";
+        return;
+    }
+
+    string today = getCurrentDate();
+    string R_day= getCurrentDate(7);
+    string sql1 = "INSERT INTO transactions (bookId, userId, issueDate, dueDate) VALUES ("
+                  + to_string(bookId) + "," + to_string(userId) + ",'" + today + "','" + R_day + "');";
+
+    string sql2 = "UPDATE books SET isAvailable=0 WHERE bookId=" + to_string(bookId) + ";";
+
+    if (executeSQL(sql1) && executeSQL(sql2)) {
+        cout << " Book issued successfully!\n";
+    } else {
+        cout << " Failed to issue book!\n";
+    }
+}
+
+void returnBook() {
+    if (currentUser.role == "Member") { cout << "Access Denied!\n"; return; }
+
+    int bookId;
+    cout << "\nEnter Book ID to Return: "; cin >> bookId; cin.ignore();
+
+    string today = getCurrentDate();
+    string sql1 = "UPDATE transactions SET returnDate='" + today + "', isReturned=1 WHERE bookId=" + to_string(bookId) + " AND isReturned=0;";
+    string sql2 = "UPDATE books SET isAvailable=1 WHERE bookId=" + to_string(bookId) + ";";
+
+    if (executeSQL(sql1) && executeSQL(sql2))
+        cout << " Book returned successfully!\n";
+    else
+        cout << " Failed to return book!\n";
+
 void showMenu() {
     while (true) {
         cout << "\n======== LIBRARY MANAGEMENT SYSTEM ========\n";
