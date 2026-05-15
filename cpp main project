@@ -30,9 +30,9 @@ bool executeSQL(const string& sql) {
     return true;
 }
 
-string getCurrentDate(int add_days=0) {
+string getCurrentDate(int add_days = 0) {
     time_t now = time(nullptr);
-    now+= add_days*86400;
+    now += add_days*86400;
     tm* ltm = localtime(&now);
     stringstream ss;
     ss << (1900 + ltm->tm_year) << "-"
@@ -98,6 +98,7 @@ void registerUser() {
 
     string sql = "INSERT INTO users (username, password, role, name) VALUES ('" + username + "', '" + pass1 + "', '" + role + "', '" + name + "');";
     if (executeSQL(sql)) cout << "User registered successfully!\n";
+else cout<<"Failed to register user(Username may already exist).\n";
 }
 // BORROW LIMIT
 bool canBorrow(int userId) {
@@ -242,9 +243,102 @@ void returnBook() {
         cout << " Book returned successfully!\n";
     else
         cout << " Failed to return book!\n";
+}
 
 
-// ====================== OTHER FUNCTIONS ======================
+                        // DELETE OPERATION
+void deleteBook() {
+    if (currentUser.role == "Member") {
+        cout << "Access Denied!\n";
+        return;
+    }
+
+    int bookId;
+    cout << "\nEnter Book ID to Delete: ";
+    cin >> bookId;
+    cin.ignore();
+
+    // Check if borrowed
+    sqlite3_stmt* stmt = nullptr;
+    string check = "SELECT COUNT(*) FROM transactions WHERE bookId = " + to_string(bookId) + " AND isReturned = 0;";
+    int borrowed = 0;
+
+    if (sqlite3_prepare_v2(db, check.c_str(), -1, &stmt, nullptr) == SQLITE_OK) {
+        if (sqlite3_step(stmt) == SQLITE_ROW)
+            borrowed = sqlite3_column_int(stmt, 0);
+    }
+    if (stmt) sqlite3_finalize(stmt);
+
+    if (borrowed > 0) {
+        cout << "Cannot delete! Book is currently borrowed.\n";
+        return;
+    }
+
+    string confirm;
+    cout << "Are you sure you want to delete this book? (yes/no): ";
+    getline(cin, confirm);
+
+    if (confirm != "yes" && confirm != "YES") {
+        cout << "Deletion cancelled.\n";
+        return;
+    }
+
+    string sql = "DELETE FROM books WHERE bookId = " + to_string(bookId) + ";";
+    if (executeSQL(sql))
+        cout << "Book deleted successfully!\n";
+    else
+        cout << "Failed to delete book.\n";
+}
+
+void deleteUser() {
+    if (currentUser.role != "Manager") {
+        cout << "Access Denied! Only Manager can delete users.\n";
+        return;
+    }
+
+    int userId;
+    cout << "\nEnter User ID to Delete: ";
+    cin >> userId;
+    cin.ignore();
+
+    if (userId == currentUser.userId) {
+        cout << "You cannot delete your own account!\n";
+        return;
+    }
+
+    // Check borrowed books
+    sqlite3_stmt* stmt = nullptr;
+    string check = "SELECT COUNT(*) FROM transactions WHERE userId = " + to_string(userId) + " AND isReturned = 0;";
+    int borrowed = 0;
+
+    if (sqlite3_prepare_v2(db, check.c_str(), -1, &stmt, nullptr) == SQLITE_OK) {
+        if (sqlite3_step(stmt) == SQLITE_ROW)
+            borrowed = sqlite3_column_int(stmt, 0);
+    }
+    if (stmt) sqlite3_finalize(stmt);
+
+    if (borrowed > 0) {
+        cout << "Cannot delete! User has " << borrowed << " book(s) borrowed.\n";
+        return;
+    }
+
+    string confirm;
+    cout << "Are you sure you want to delete this user? (yes/no): ";
+    getline(cin, confirm);
+
+    if (confirm != "yes" && confirm != "YES") {
+        cout << "Deletion cancelled.\n";
+        return;
+    }
+
+    string sql = "DELETE FROM users WHERE userId = " + to_string(userId) + ";";
+    if (executeSQL(sql))
+        cout << "User deleted successfully!\n";
+    else
+        cout << "Failed to delete user.\n";
+}
+
+                        //OTHER FUNCTIONS
 void viewRecentActivities() {
     if (currentUser.role != "Manager") {
         cout << "Access Denied!\n"; return;
@@ -312,9 +406,11 @@ void viewAllUsers() {
     if (stmt) sqlite3_finalize(stmt);
 }
 
+
+// MENU
 void showMenu() {
     while (true) {
-        cout << "\n======== LIBRARY MANAGEMENT SYSTEM ========\n";
+        cout << "\n LIBRARY MANAGEMENT SYSTEM \n";
         cout << "Logged in as: " << currentUser.name << " (" << currentUser.role << ")\n";
         cout << string(50, '-') << "\n";
 
@@ -325,16 +421,18 @@ void showMenu() {
             cout << "3. Add Book\n";
             cout << "4. Issue Book\n";
             cout << "5. Return Book\n";
-            cout << "6. View All Users\n";
+            cout<< "6. Delete Book\n";
+            cout << "7. View All Users\n";
         }
 
         if (currentUser.role == "Manager") {
-            cout << "7. Register New User\n";
-            cout << "8. View 30 Recent Activities\n";
+            cout << "8. Register New User\n";
+            cout<<"9. Delete User\n";
+            cout << "10. View 30 Recent Activities\n";
         }
 
         cout << "0. Logout\n";
-        cout << "9. Exit Program\n";
+        cout << "99. Exit Program\n";
         cout << "Choice: ";
 
         int choice;
@@ -347,17 +445,19 @@ void showMenu() {
             case 3: addBook(); break;
             case 4: issueBook(); break;
             case 5: returnBook(); break;
-            case 6: viewAllUsers(); break;
-            case 7: registerUser(); break;
-            case 8: viewRecentActivities(); break;
+            case 6:deleteBook();break;
+            case 7: viewAllUsers(); break;
+            case 8: registerUser(); break;
+            case 9:deleteUser();break;
+            case 10: viewRecentActivities(); break;
             case 0:
                 cout << "\nLogging out...\n";
                 return;
-            case 9:
+            case 99:
                 cout << "Thank you! Goodbye.\n";
                 sqlite3_close(db);
                 exit(0);
-            default: 
+            default:
                 cout << "Invalid choice!\n";
         }
     }
