@@ -1,0 +1,41 @@
+#include <iostream>
+#include <string>
+#include <iomanip>
+#include <sstream>
+#include <ctime>
+#include "sqlite3.h"
+
+using namespace std;
+
+sqlite3* db = nullptr;
+
+struct User {
+    int userId;
+    string username;
+    string password;
+    string role;
+    string name;
+};
+
+User currentUser;
+
+
+// MAIN
+int main() {
+    cout << " Library Management System \n\n";
+
+    if (sqlite3_open("library.db", &db) != SQLITE_OK) {
+        cerr << "Cannot open database!\n";
+        return 1;
+    }
+
+    initDatabase();
+
+    while (true) {
+        if (login()) {
+            showMenu();
+        }
+    }
+
+    return 0;
+}
