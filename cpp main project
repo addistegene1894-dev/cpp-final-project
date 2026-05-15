@@ -99,6 +99,87 @@ void registerUser() {
     string sql = "INSERT INTO users (username, password, role, name) VALUES ('" + username + "', '" + pass1 + "', '" + role + "', '" + name + "');";
     if (executeSQL(sql)) cout << "User registered successfully!\n";
 }
+// BORROW LIMIT
+bool canBorrow(int userId) {
+    const int MAX_BOOKS = 3;
+    sqlite3_stmt* stmt = nullptr;
+    string sql = "SELECT COUNT(*) FROM transactions WHERE userId = " + to_string(userId) + " AND isReturned = 0;";
+
+    if (sqlite3_prepare_v2(db, sql.c_str(), -1, &stmt, nullptr) == SQLITE_OK) {
+        if (sqlite3_step(stmt) == SQLITE_ROW) {
+            int count = sqlite3_column_int(stmt, 0);
+            sqlite3_finalize(stmt);
+
+            if (count >= MAX_BOOKS) {
+                cout << "This user has already borrowed " << count << " books (Max allowed: 3)\n";
+                return false;
+            }
+            return true;
+        }
+    }
+    if (stmt) sqlite3_finalize(stmt);
+    return true;  // Allow if query fails (safer)
+}
+
+// BOOK FUNCTIONS
+void addBook() {
+    if (currentUser.role == "Member") { cout << "Access Denied!\n"; return; }
+
+    string title, author, isbn;
+    cout << "\nEnter Book Title: "; getline(cin, title);
+    cout << "Enter Author: "; getline(cin, author);
+    cout << "Enter ISBN: "; getline(cin, isbn);
+
+    string sql = "INSERT INTO books (title, author, isbn) VALUES ('" + title + "','" + author + "','" + isbn + "');";
+    if (executeSQL(sql)) cout << "Book added successfully!\n";
+}
+
+void viewAllBooks() {
+    cout << "\n ALL BOOKS \n";
+    cout << left << setw(6) << "ID" << setw(35) << "Title" << setw(25) << "Author"
+         << setw(15) << "ISBN" << " Status\n";
+    cout << string(85, '-') << endl;
+
+    sqlite3_stmt* stmt = nullptr;
+    if (sqlite3_prepare_v2(db, "SELECT * FROM books;", -1, &stmt, nullptr) == SQLITE_OK) {
+        while (sqlite3_step(stmt) == SQLITE_ROW) {
+            cout << left << setw(6) << sqlite3_column_int(stmt, 0)
+                 << setw(35) << reinterpret_cast<const char*>(sqlite3_column_text(stmt, 1))
+                 << setw(25) << reinterpret_cast<const char*>(sqlite3_column_text(stmt, 2))
+                 << setw(15) << reinterpret_cast<const char*>(sqlite3_column_text(stmt, 3))
+                 << (sqlite3_column_int(stmt, 4) ? "Available" : "Borrowed") << endl;
+        }
+    }
+    if (stmt) sqlite3_finalize(stmt);
+}
+
+void searchBook() {
+    cout << "\nSearch by:\n1. ID\n2. Title\n3. Author\nChoice: ";
+    int ch; cin >> ch; cin.ignore();
+
+    string term;
+    cout << "Enter search term: "; getline(cin, term);
+
+    string sql;
+    if (ch == 1) sql = "SELECT * FROM books WHERE bookId = " + term + ";";
+    else if (ch == 2) sql = "SELECT * FROM books WHERE title LIKE '%" + term + "%';";
+    else sql = "SELECT * FROM books WHERE author LIKE '%" + term + "%';";
+
+    cout << "\n Search Results \n";
+    sqlite3_stmt* stmt = nullptr;
+    if (sqlite3_prepare_v2(db, sql.c_str(), -1, &stmt, nullptr) == SQLITE_OK) {
+        bool found = false;
+        while (sqlite3_step(stmt) == SQLITE_ROW) {
+            found = true;
+            cout << "ID: " << sqlite3_column_int(stmt, 0)
+                 << " | " << reinterpret_cast<const char*>(sqlite3_column_text(stmt, 1))
+                 << " | " << reinterpret_cast<const char*>(sqlite3_column_text(stmt, 2))
+                 << " | " << (sqlite3_column_int(stmt, 4) ? "Available" : "Borrowed") << endl;
+        }
+        if (!found) cout << "No results found.\n";
+    }
+    if (stmt) sqlite3_finalize(stmt);
+}
 
 //  TRANSACTIONS
 void issueBook() {
