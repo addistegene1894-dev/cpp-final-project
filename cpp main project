@@ -51,7 +51,54 @@ void initDatabase() {
     cout << "Database initialized successfully!\n";
 }
 
+// AUTHENTICATION
+bool login() {
+    string username, password;
+    cout << "\n LIBRARY LOGIN \n";
+    cout << "Username: "; getline(cin, username);
+    cout << "Password: "; getline(cin, password);
 
+    string sql = "SELECT * FROM users WHERE username = '" + username + "' AND password = '" + password + "';";
+    sqlite3_stmt* stmt = nullptr;
+
+    if (sqlite3_prepare_v2(db, sql.c_str(), -1, &stmt, nullptr) == SQLITE_OK) {
+        if (sqlite3_step(stmt) == SQLITE_ROW) {
+            currentUser.userId = sqlite3_column_int(stmt, 0);
+            currentUser.username = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 1));
+            currentUser.role = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 3));
+            currentUser.name = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 4));
+            sqlite3_finalize(stmt);
+            cout << "\n  Login Successful! Welcome, " << currentUser.name << " (" << currentUser.role << ")\n";
+            return true;
+        }
+    }
+    if (stmt) sqlite3_finalize(stmt);
+    cout << "Invalid username or password!\n";
+    return false;
+}
+
+void registerUser() {
+    if (currentUser.role != "Manager") {
+        cout << "Access Denied! Only Manager can register users.\n";
+        return;
+    }
+
+    string username, pass1, pass2, role, name;
+    cout << "\n Register New User \n";
+    cout << "Username: "; getline(cin, username);
+    cout << "Full Name: "; getline(cin, name);
+    cout << "Role (Manager/Librarian/Member): "; getline(cin, role);
+    cout << "Password: "; getline(cin, pass1);
+    cout << "Confirm Password: "; getline(cin, pass2);
+
+    if (pass1 != pass2) {
+        cout << " Passwords do not match!\n";
+        return;
+    }
+
+    string sql = "INSERT INTO users (username, password, role, name) VALUES ('" + username + "', '" + pass1 + "', '" + role + "', '" + name + "');";
+    if (executeSQL(sql)) cout << "User registered successfully!\n";
+}
 
 void showMenu() {
     while (true) {
