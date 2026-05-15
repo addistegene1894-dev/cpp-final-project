@@ -243,6 +243,75 @@ void returnBook() {
     else
         cout << " Failed to return book!\n";
 
+
+// ====================== OTHER FUNCTIONS ======================
+void viewRecentActivities() {
+    if (currentUser.role != "Manager") {
+        cout << "Access Denied!\n"; return;
+    }
+    // ... (keep your original function)
+    cout << "\n 30 MOST RECENT ACTIVITIES \n";
+    cout << left << setw(8) << "TransID" << setw(8) << "BookID" << setw(30) << "Book Title"
+         << setw(20) << "User Name" << setw(12) << "Action" << "Date\n";
+    cout << string(90, '-') << endl;
+
+    string sql = R"(
+        SELECT t.transactionId, t.bookId, b.title, u.name,
+               CASE WHEN t.isReturned = 1 THEN 'Returned' ELSE 'Issued' END,
+               COALESCE(t.returnDate, t.issueDate)
+        FROM transactions t
+        JOIN books b ON t.bookId = b.bookId
+        JOIN users u ON t.userId = u.userId
+        ORDER BY t.transactionId DESC LIMIT 30;
+    )";
+
+    sqlite3_stmt* stmt = nullptr;
+    if (sqlite3_prepare_v2(db, sql.c_str(), -1, &stmt, nullptr) == SQLITE_OK) {
+        bool has = false;
+        while (sqlite3_step(stmt) == SQLITE_ROW) {
+            has = true;
+            cout << left << setw(8) << sqlite3_column_int(stmt, 0)
+                 << setw(8) << sqlite3_column_int(stmt, 1)
+                 << setw(30) << reinterpret_cast<const char*>(sqlite3_column_text(stmt, 2))
+                 << setw(20) << reinterpret_cast<const char*>(sqlite3_column_text(stmt, 3))
+                 << setw(12) << reinterpret_cast<const char*>(sqlite3_column_text(stmt, 4))
+                 << reinterpret_cast<const char*>(sqlite3_column_text(stmt, 5)) << endl;
+        }
+        if (!has) cout << "No activities yet.\n";
+    }
+    if (stmt) sqlite3_finalize(stmt);
+}
+
+void viewAllUsers() {
+    if (currentUser.role == "Member") { cout << "Access Denied!\n"; return; }
+
+    cout << "\n ALL USERS \n";
+    cout << left << setw(6) << "ID" << setw(25) << "Name" << setw(15) << "Role"
+         << setw(10) << "Borrowed\n";
+    cout << string(60, '-') << endl;
+
+    sqlite3_stmt* stmt = nullptr;
+    if (sqlite3_prepare_v2(db, "SELECT userId, name, role FROM users;", -1, &stmt, nullptr) == SQLITE_OK) {
+        while (sqlite3_step(stmt) == SQLITE_ROW) {
+            int uid = sqlite3_column_int(stmt, 0);
+            string name = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 1));
+            string role = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 2));
+
+            sqlite3_stmt* cstmt = nullptr;
+            int borrowed = 0;
+            string csql = "SELECT COUNT(*) FROM transactions WHERE userId=" + to_string(uid) + " AND isReturned=0;";
+            if (sqlite3_prepare_v2(db, csql.c_str(), -1, &cstmt, nullptr) == SQLITE_OK) {
+                if (sqlite3_step(cstmt) == SQLITE_ROW) borrowed = sqlite3_column_int(cstmt, 0);
+            }
+            if (cstmt) sqlite3_finalize(cstmt);
+
+            cout << left << setw(6) << uid << setw(25) << name << setw(15) << role
+                 << setw(10) << borrowed << endl;
+        }
+    }
+    if (stmt) sqlite3_finalize(stmt);
+}
+
 void showMenu() {
     while (true) {
         cout << "\n======== LIBRARY MANAGEMENT SYSTEM ========\n";
