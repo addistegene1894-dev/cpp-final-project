@@ -20,6 +20,71 @@ struct User {
 User currentUser;
 
 
+
+// DATABASE
+void initDatabase() {
+    executeSQL(R"(CREATE TABLE IF NOT EXISTS users (userId INTEGER PRIMARY KEY, username TEXT UNIQUE NOT NULL, password TEXT NOT NULL, role TEXT NOT NULL, name TEXT);)");
+    executeSQL(R"(CREATE TABLE IF NOT EXISTS books (bookId INTEGER PRIMARY KEY, title TEXT NOT NULL, author TEXT NOT NULL, isbn TEXT UNIQUE, isAvailable INTEGER DEFAULT 1);)");
+    executeSQL(R"(CREATE TABLE IF NOT EXISTS transactions (transactionId INTEGER PRIMARY KEY, bookId INTEGER, userId INTEGER, issueDate TEXT, dueDate TEXT, returnDate TEXT, isReturned INTEGER DEFAULT 0);)");
+
+    executeSQL("INSERT OR IGNORE INTO users (username, password, role, name) VALUES ('admin', 'admin123', 'Manager', 'Addis');");
+    cout << "Database initialized successfully!\n";
+}
+
+
+
+void showMenu() {
+    while (true) {
+        cout << "\n======== LIBRARY MANAGEMENT SYSTEM ========\n";
+        cout << "Logged in as: " << currentUser.name << " (" << currentUser.role << ")\n";
+        cout << string(50, '-') << "\n";
+
+        cout << "1. View All Books\n";
+        cout << "2. Search Book\n";
+
+        if (currentUser.role != "Member") {
+            cout << "3. Add Book\n";
+            cout << "4. Issue Book\n";
+            cout << "5. Return Book\n";
+            cout << "6. View All Users\n";
+        }
+
+        if (currentUser.role == "Manager") {
+            cout << "7. Register New User\n";
+            cout << "8. View 30 Recent Activities\n";
+        }
+
+        cout << "0. Logout\n";
+        cout << "9. Exit Program\n";
+        cout << "Choice: ";
+
+        int choice;
+        cin >> choice;
+        cin.ignore();
+
+        switch (choice) {
+            case 1: viewAllBooks(); break;
+            case 2: searchBook(); break;
+            case 3: addBook(); break;
+            case 4: issueBook(); break;
+            case 5: returnBook(); break;
+            case 6: viewAllUsers(); break;
+            case 7: registerUser(); break;
+            case 8: viewRecentActivities(); break;
+            case 0:
+                cout << "\nLogging out...\n";
+                return;
+            case 9:
+                cout << "Thank you! Goodbye.\n";
+                sqlite3_close(db);
+                exit(0);
+            default: 
+                cout << "Invalid choice!\n";
+        }
+    }
+}
+
+
 // MAIN
 int main() {
     cout << " Library Management System \n\n";
